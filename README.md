@@ -50,43 +50,59 @@ supabase/schema.sql    tables, RLS policies, storage buckets
    - public storage buckets `avatars`, `resumes` and `media`, which only admins can upload to
 
    The script is safe to run again later.
-3. Open **Project Settings → API** (or **Connect**) and copy the **Project URL** and the **anon / publishable key**.
+3. Open **Project Settings → API Keys** and copy the **Project URL** and the **Publishable key**
+   (`sb_publishable_...`). If you only see a **Create new API keys** button, click it first. The legacy `anon`
+   key also works, but Supabase is retiring the legacy `anon` and `service_role` keys, so use the new ones.
 
-## 2. Set your admin login (automatic)
+## 2. Create your admin login
 
-Your admin email and password live in env variables. Every `npm run build` (locally, on Vercel and in Docker)
-first runs [`scripts/seed-admin.mjs`](scripts/seed-admin.mjs), which:
+Pick one option.
 
-- creates the user if it doesn't exist (already confirmed, no email link needed)
-- otherwise sets its password to the current `ADMIN_PASSWORD`, so the env file is the source of truth
-- adds the user to the `admins` table
+### Option A: by hand in Supabase (recommended, no secrets on your PC)
 
-Add these three to `.env.local` (and to Vercel, see step 4):
+1. In **Authentication → Users**, click **Add user → Create new user**, enter your email and password, tick
+   **Auto Confirm User** and click **Create user**.
+2. In **SQL Editor → New query**, run (with your email):
+
+   ```sql
+   insert into public.admins (user_id)
+   select id from auth.users where email = 'you@example.com';
+   ```
+
+   The editor shows "Success. No rows returned" whether or not a row was added. To check, run:
+
+   ```sql
+   select u.email, a.user_id is not null as is_admin
+   from auth.users u
+   left join public.admins a on a.user_id = u.id;
+   ```
+
+   Your email should show `is_admin = true`.
+
+To change the password later, open your user in **Authentication → Users** and send a password recovery email
+(set the **Site URL** first, see step 4).
+
+### Option B: automatic from env variables
+
+Every `npm run build` (locally, on Vercel and in Docker) first runs
+[`scripts/seed-admin.mjs`](scripts/seed-admin.mjs). If these three are set, it creates the user (already
+confirmed), resets its password to `ADMIN_PASSWORD` when that changes, and adds it to `admins`:
 
 ```
-SUPABASE_SERVICE_ROLE_KEY=...      # Project Settings → API Keys → service_role (or "secret") key
+SUPABASE_SERVICE_ROLE_KEY=sb_secret_...   # Project Settings → API Keys → Secret key (or legacy service_role)
 ADMIN_EMAIL=you@example.com
-ADMIN_PASSWORD=a-strong-password   # at least 8 characters
+ADMIN_PASSWORD=a-strong-password          # at least 8 characters
 ```
 
-To run it without a full build:
+Set all three or none: if only some are set, the build stops with a "Missing ..." error. With none set, the
+step is skipped. To run it without a full build: `npm run seed:admin`.
 
-```bash
-npm run seed:admin
-```
+> **The secret / service role key has full access to your project.** Never prefix it with `NEXT_PUBLIC_`,
+> never commit it, never paste it anywhere public. Only the seed script uses it; the website itself never does.
 
-> **The service role key is a full-access secret.** Never prefix it with `NEXT_PUBLIC_`, never commit it,
-> never paste it anywhere public. Only the seed script uses it; the website itself never does.
+### Either way
 
-If you leave all three empty, the step is skipped and you can create the admin by hand instead: create a user
-in **Authentication → Users** (tick **Auto Confirm User**), then run this in the **SQL Editor**:
-
-```sql
-insert into public.admins (user_id)
-select id from auth.users where email = 'you@example.com';
-```
-
-Recommended: turn off public sign-ups in **Authentication → Sign In / Providers → Allow new users to sign up**.
+Turn off public sign-ups in **Authentication → Sign In / Providers → Allow new users to sign up**.
 Even with sign-ups on, a new account can't edit anything unless it's in `admins`.
 
 ## 3. Run locally
@@ -110,9 +126,11 @@ Fill in `.env.local`:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_...
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
+
+That's all you need with option A. With option B, also add the three admin variables.
 
 ```bash
 npm run dev
@@ -121,8 +139,8 @@ npm run dev
 Open <http://localhost:3000/admin>, sign in, and fill in your profile, socials, projects and so on.
 The homepage is at <http://localhost:3000>.
 
-> The anon key is meant to be public. Security comes from the RLS policies in `schema.sql`, not from hiding
-> the key. Never put the `service_role` key in this project.
+> The publishable (anon) key is meant to be public. Security comes from the RLS policies in `schema.sql`, not
+> from hiding the key. The secret / `service_role` key is only ever read by the optional seed script.
 
 ### Optional: a local Supabase in Docker
 
@@ -179,9 +197,10 @@ another file, for example `.env.supabase.local`, so you can switch back. The loc
    The framework preset (Next.js) is detected automatically.
 3. Under **Environment Variables** add `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` and
    `NEXT_PUBLIC_SITE_URL` (your Vercel URL, e.g. `https://your-name.vercel.app`, or your custom domain).
-   Also add `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_EMAIL` and `ADMIN_PASSWORD` so each deploy keeps your admin
-   login in sync. Vercel keeps them server-side because they have no `NEXT_PUBLIC_` prefix.
-4. Click **Deploy**. Later pushes to `main` redeploy automatically.
+   Only if you use option B for the admin login, also add `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_EMAIL` and
+   `ADMIN_PASSWORD`. Vercel keeps them server-side because they have no `NEXT_PUBLIC_` prefix.
+4. Click **Deploy**. Later pushes to `main` redeploy automatically. If you change `NEXT_PUBLIC_SITE_URL`
+   afterwards (for example once you know your Vercel URL), redeploy: `NEXT_PUBLIC_*` values are built in.
 5. In Supabase, go to **Authentication → URL Configuration** and set **Site URL** to your Vercel URL.
 
 Edits made in `/admin` on the live site show up immediately. You don't need to redeploy for content changes.
@@ -193,8 +212,11 @@ You need [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or D
 
 1. Create `.env.local` as in step 3. Docker reads your Supabase values from it.
 2. Stop `npm run dev` if it's running (both use port 3000).
-3. Load `.env.local` into your shell, so the build can also create your admin user from the
-   `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_EMAIL` and `ADMIN_PASSWORD` build secrets.
+3. **Only for admin login option B:** load `.env.local` into your shell, so the build can create your admin
+   user from the `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_EMAIL` and `ADMIN_PASSWORD` build secrets.
+   With option A, skip this step. If `docker compose` then complains that a secret's environment variable is
+   not set, use the plain `docker build` / `docker run` commands further down instead: they don't need the
+   admin secrets.
 
    Git Bash / macOS / Linux:
 
@@ -247,7 +269,7 @@ docker run -d --name portfolio -p 3000:3000 --restart unless-stopped portfolio
 How it works:
 - `NEXT_PUBLIC_*` values are **baked in when the image is built**, not read when the container starts. If you
   change them, rebuild the image.
-- `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_EMAIL` and `ADMIN_PASSWORD` are passed as **build secrets**. The admin
+- With option B, `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_EMAIL` and `ADMIN_PASSWORD` are passed as **build secrets**. The admin
   seed runs during the build, and these values are never stored in the image. With plain `docker build`,
   pass them with
   `--secret id=SUPABASE_SERVICE_ROLE_KEY,env=SUPABASE_SERVICE_ROLE_KEY --secret id=ADMIN_EMAIL,env=ADMIN_EMAIL --secret id=ADMIN_PASSWORD,env=ADMIN_PASSWORD`
