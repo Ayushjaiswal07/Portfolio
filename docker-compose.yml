@@ -1,0 +1,31 @@
+# Run with:  docker compose --env-file .env.local up -d --build
+# --env-file supplies the values used below at build time.
+
+services:
+  portfolio:
+    build:
+      context: .
+      args:
+        # Checked inside the Dockerfile, so `down`, `ps` and `logs` work without --env-file.
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
+      # Used only during the build to create/update the admin user.
+      # Build secrets are not saved in the image.
+      secrets:
+        - SUPABASE_SERVICE_ROLE_KEY
+        - ADMIN_EMAIL
+        - ADMIN_PASSWORD
+    image: portfolio:latest
+    container_name: portfolio
+    ports:
+      - "${PORT:-3000}:3000"
+    restart: unless-stopped
+
+secrets:
+  SUPABASE_SERVICE_ROLE_KEY:
+    environment: SUPABASE_SERVICE_ROLE_KEY
+  ADMIN_EMAIL:
+    environment: ADMIN_EMAIL
+  ADMIN_PASSWORD:
+    environment: ADMIN_PASSWORD

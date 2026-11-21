@@ -1,0 +1,32 @@
+/** Icon identifiers selectable in the admin. Rendered by components/social-icon.tsx. */
+export const SOCIAL_ICON_OPTIONS = [
+  { value: "github", label: "GitHub" },
+  { value: "linkedin", label: "LinkedIn" },
+  { value: "x", label: "X / Twitter" },
+  { value: "youtube", label: "YouTube" },
+  { value: "instagram", label: "Instagram" },
+  { value: "email", label: "Email" },
+  { value: "website", label: "Website" },
+  { value: "medium", label: "Medium" },
+  { value: "devto", label: "DEV.to" },
+  { value: "hashnode", label: "Hashnode" },
+  { value: "substack", label: "Substack" },
+  { value: "stackoverflow", label: "Stack Overflow" },
+  { value: "leetcode", label: "LeetCode" },
+  { value: "codeforces", label: "Codeforces" },
+  { value: "hackerrank", label: "HackerRank" },
+  { value: "kaggle", label: "Kaggle" },
+  { value: "codepen", label: "CodePen" },
+  { value: "dribbble", label: "Dribbble" },
+  { value: "behance", label: "Behance" },
+  { value: "facebook", label: "Facebook" },
+  { value: "threads", label: "Threads" },
+  { value: "bluesky", label: "Bluesky" },
+  { value: "mastodon", label: "Mastodon" },
+  { value: "reddit", label: "Reddit" },
+  { value: "discord", label: "Discord" },
+  { value: "telegram", label: "Telegram" },
+  { value: "twitch", label: "Twitch" },
+] as const;
+
+export type SocialIconKey = (typeof SOCIAL_ICON_OPTIONS)[number]["value"];
