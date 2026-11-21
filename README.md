@@ -91,7 +91,10 @@ Even with sign-ups on, a new account can't edit anything unless it's in `admins`
 
 ## 3. Run locally
 
-You need [Node.js](https://nodejs.org) 20.9 or newer.
+You need [Node.js](https://nodejs.org) 20.12 or newer (the admin seed script uses `process.loadEnvFile`).
+
+> **Windows:** the commands below work in Git Bash and PowerShell unless a block is marked otherwise.
+> PowerShell lines are shown separately where the syntax differs.
 
 ```bash
 npm install
@@ -100,6 +103,8 @@ npm install
 ```bash
 cp .env.example .env.local
 ```
+
+Skip this if `.env.local` already exists.
 
 Fill in `.env.local`:
 
@@ -134,6 +139,12 @@ Then apply the schema and print the local URL and keys:
 docker exec -i supabase_db_ayush-portfolio psql -U postgres -d postgres < supabase/schema.sql
 ```
 
+PowerShell has no `<` redirection, so there use:
+
+```powershell
+Get-Content supabase/schema.sql -Raw | docker exec -i supabase_db_ayush-portfolio psql -U postgres -d postgres
+```
+
 ```bash
 npx supabase status
 ```
@@ -147,12 +158,22 @@ another file, for example `.env.supabase.local`, so you can switch back. The loc
 1. Push this folder to a GitHub repository:
 
    ```bash
+   git init                # skip if the folder is already a git repository
    git add .
    git commit -m "Initial portfolio"
    git branch -M main
    git remote add origin https://github.com/<you>/<repo>.git
    git push -u origin main
    ```
+
+   If git says **"detected dubious ownership in repository"** (the folder was created by another Windows
+   user), mark it as safe once and run the commands again:
+
+   ```bash
+   git config --global --add safe.directory "D:/Ayush Portfolio"
+   ```
+
+   If `git remote add` says the remote already exists, use `git remote set-url origin <url>` instead.
 
 2. Go to [vercel.com/new](https://vercel.com/new), sign in with GitHub and **Import** the repository.
    The framework preset (Next.js) is detected automatically.
@@ -171,13 +192,36 @@ Use this to self-host on any server or VPS, or to run the production build local
 You need [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine with Compose).
 
 1. Create `.env.local` as in step 3. Docker reads your Supabase values from it.
-2. Build and start the container:
+2. Stop `npm run dev` if it's running (both use port 3000).
+3. Load `.env.local` into your shell, so the build can also create your admin user from the
+   `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_EMAIL` and `ADMIN_PASSWORD` build secrets.
+
+   Git Bash / macOS / Linux:
+
+   ```bash
+   set -a; source .env.local; set +a
+   ```
+
+   PowerShell:
+
+   ```powershell
+   Get-Content .env.local | ForEach-Object {
+     if ($_ -match '^\s*([^#=\s][^=]*)=(.*)$') {
+       [Environment]::SetEnvironmentVariable($matches[1].Trim(), $matches[2].Trim(), 'Process')
+     }
+   }
+   ```
+
+   This only lasts for the current terminal window. If you skip it, the site still builds but the admin
+   seed step is skipped.
+
+4. Build and start the container:
 
    ```bash
    docker compose --env-file .env.local up -d --build
    ```
 
-3. Open <http://localhost:3000>.
+5. Open <http://localhost:3000>.
 
 Everyday commands:
 
@@ -187,7 +231,8 @@ Everyday commands:
 | `docker compose logs -f` | Follow the server logs |
 | `docker compose ps` | Show status and health |
 | `docker compose down` | Stop and remove the container |
-| `PORT=8080 docker compose --env-file .env.local up -d` | Serve on another host port |
+| `PORT=8080 docker compose --env-file .env.local up -d` | Serve on another host port (Git Bash) |
+| `$env:PORT=8080; docker compose --env-file .env.local up -d` | Serve on another host port (PowerShell) |
 
 Without Compose:
 
@@ -232,7 +277,7 @@ How it works:
 
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | Start the dev server on port 3000 |
+| `npm run dev` | Start the dev server on port 3000 (Ctrl+C to stop) |
 | `npm run build` | Create/update the admin user from env, then production build |
 | `npm run seed:admin` | Only create/update the admin user |
 | `npm start` | Serve the production build |
